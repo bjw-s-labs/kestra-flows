@@ -1,0 +1,73 @@
+---
+id: notifyOnNewFluxRelease
+namespace: releases
+
+triggers:
+  - id: schedule_trigger
+    type: io.kestra.plugin.core.trigger.Schedule
+    cron: "*/5 * * * *"
+
+tasks:
+  - id: get_last_release
+    type: io.kestra.plugin.core.kv.Get
+    key: flux_last_release
+    errorOnMissing: false
+
+  - id: fetch_latest_release
+    type: io.kestra.plugin.core.flow.Subflow
+    namespace: releases
+    flowId: fetchLatestGitHubRelease
+    inputs:
+      repository_owner: fluxcd
+      repository: flux2
+    wait: true
+    transmitFailed: true
+
+  - id: get_published_at_timestamp
+    type: io.kestra.plugin.core.debug.Return
+    format: "{{ outputs.fetch_latest_release.outputs.release[0].published_at | timestamp() }}"
+
+  - id: decide_notify
+    type: io.kestra.plugin.core.flow.Switch
+    value: "{{ (outputs.get_published_at_timestamp.value | number('LONG')) > (outputs.get_last_release.value | default('0') | number('LONG')) }}"
+    cases:
+      true:
+        - id: notify_home_ops_discord
+          type: io.kestra.plugin.notifications.discord.DiscordIncomingWebhook
+          url: "{{ secret('DISCORD_WEBHOOK_HOME_OPERATIONS_FLUX') }}" # https://discord.com/api/webhooks/000000/xxxxxxxxxxx
+          payload: |
+            {
+              "content": "A new Flux version has been released!",
+              "username": "Flux",
+              "avatar_url": "https://avatars.githubusercontent.com/u/52158677?s=200&v=4",
+              "embeds": [
+                {
+                  "title": "Flux release {{ outputs.fetch_latest_release.outputs.release[0].tag_name }}",
+                  "url": "{{ outputs.fetch_latest_release.outputs.release[0].html_url }}",
+                  "thumbnail": {
+                    "url": "https://avatars.githubusercontent.com/u/52158677?s=200&v=4"
+                  },
+                  "color": "3612660",
+                  "fields": [
+                    {
+                      "name": "Published",
+                      "value": "{{ outputs.fetch_latest_release.outputs.release[0].published_at }}"
+                    },
+                    {
+                      "name": "Release link",
+                      "value": "{{ outputs.fetch_latest_release.outputs.release[0].html_url }}"
+                    }
+                  ]
+                }
+              ]
+            }
+
+        - id: store_last_release
+          type: io.kestra.plugin.core.kv.Set
+          key: flux_last_release
+          value: "{{ outputs.get_published_at_timestamp.value }}"
+
+    defaults:
+      - id: no-op
+        type: io.kestra.plugin.core.log.Log
+        message: "Nothing to do"

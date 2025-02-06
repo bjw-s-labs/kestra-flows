@@ -1,5 +1,5 @@
 ---
-id: fetchLatestTalosRelease
+id: notifyOnNewTalosRelease
 namespace: releases
 
 triggers:

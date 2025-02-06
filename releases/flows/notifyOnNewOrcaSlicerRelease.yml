@@ -1,5 +1,5 @@
 ---
-id: fetchLatestFluxRelease
+id: notifyOnNewOrcaSlicerRelease
 namespace: releases
 
 triggers:
@@ -10,7 +10,7 @@ triggers:
 tasks:
   - id: get_last_release
     type: io.kestra.plugin.core.kv.Get
-    key: flux_last_release
+    key: orcaslicer_last_release
     errorOnMissing: false
 
   - id: fetch_latest_release
@@ -18,8 +18,8 @@ tasks:
     namespace: releases
     flowId: fetchLatestGitHubRelease
     inputs:
-      repository_owner: fluxcd
-      repository: flux2
+      repository_owner: SoftFever
+      repository: OrcaSlicer
     wait: true
     transmitFailed: true
 
@@ -32,22 +32,22 @@ tasks:
     value: "{{ (outputs.get_published_at_timestamp.value | number('LONG')) > (outputs.get_last_release.value | default('0') | number('LONG')) }}"
     cases:
       true:
-        - id: notify_home_ops_discord
+        - id: notify_bjws_discord
           type: io.kestra.plugin.notifications.discord.DiscordIncomingWebhook
-          url: "{{ secret('DISCORD_WEBHOOK_HOME_OPERATIONS_FLUX') }}" # https://discord.com/api/webhooks/000000/xxxxxxxxxxx
+          url: "{{ secret('DISCORD_WEBHOOK_BJWS_RELEASES') }}"
           payload: |
             {
-              "content": "A new Flux version has been released!",
-              "username": "Flux",
-              "avatar_url": "https://avatars.githubusercontent.com/u/52158677?s=200&v=4",
+              "content": "A new OrcaSlicer version has been released!",
+              "username": "OrcaSlicer",
+              "avatar_url": "https://wiki.bambulab.com/admin/home/logo-large.png",
               "embeds": [
                 {
-                  "title": "Flux release {{ outputs.fetch_latest_release.outputs.release[0].tag_name }}",
+                  "title": "OrcaSlicer release {{ outputs.fetch_latest_release.outputs.release[0].tag_name }}",
                   "url": "{{ outputs.fetch_latest_release.outputs.release[0].html_url }}",
                   "thumbnail": {
-                    "url": "https://avatars.githubusercontent.com/u/52158677?s=200&v=4"
+                    "url": "https://wiki.bambulab.com/admin/home/logo-large.png"
                   },
-                  "color": "3612660",
+                  "color": "2467139",
                   "fields": [
                     {
                       "name": "Published",
@@ -64,7 +64,7 @@ tasks:
 
         - id: store_last_release
           type: io.kestra.plugin.core.kv.Set
-          key: flux_last_release
+          key: orcaslicer_last_release
           value: "{{ outputs.get_published_at_timestamp.value }}"
 
     defaults:
