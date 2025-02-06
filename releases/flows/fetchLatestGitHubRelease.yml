@@ -1,0 +1,35 @@
+---
+id: fetchLatestGitHubRelease
+namespace: releases
+
+inputs:
+  - id: repository_owner
+    type: STRING
+
+  - id: repository
+    type: STRING
+
+  - id: include_prereleases
+    type: BOOLEAN
+    defaults: false
+
+tasks:
+  - id: get_releases_for_repo
+    type: io.kestra.plugin.core.http.Request
+    uri: https://api.github.com/repos/{{ inputs.repository_owner }}/{{ inputs.repository }}/releases?per_page=10
+    method: GET
+
+  - id: get_latest_release
+    type: io.kestra.plugin.core.debug.Return
+    format: |
+      {% if inputs.include_prereleases == true %}
+        {{ outputs.get_releases_for_repo.body | jq('[.[] | select(.draft == false)] | first') }}
+      {% else %}
+        {{ outputs.get_releases_for_repo.body | jq('[.[] | select(.draft == false and .prerelease == false)] | first') }}
+      {% endif %}
+
+outputs:
+  - id: release
+    type: ARRAY
+    value: |
+      {{ outputs.get_latest_release.value }}
